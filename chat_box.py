@@ -452,7 +452,7 @@ class ChatBox(App):
 
         # recv message from queue
         while True:
-            msg = await self.cli.que_recv.get()
+            msg = await self.cli.arecv()
             await self.on_flush_message(msg)
 
     async def on_flush_message(self, message: Message):
@@ -478,7 +478,7 @@ class ChatBox(App):
         await self.on_flush_message(msg)
         self.input_box.value = ""
         # to send message
-        await self.cli.que_send.put(msg)
+        await self.cli.asend(msg)
 
 def main():
     import argparse
@@ -486,7 +486,8 @@ def main():
     parser.add_argument("-u", '--user_name', help="chat user name", type=str, default="User")
     parser.add_argument("-s", '--ws_url', help="ws url", type=str, default="ws://localhost:5555")
     args = parser.parse_args()
-    ChatBox.run(user=args.user_name, ws_url=args.ws_url)
+    ws_url = f'{args.ws_url}/ws/{args.user_name}?token=default_tokne'
+    ChatBox.run(user=args.user_name, ws_url=ws_url)
 
 if __name__ == '__main__':
     main()

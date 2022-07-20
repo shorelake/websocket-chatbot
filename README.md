@@ -12,7 +12,7 @@ pip install -r requirements.txt
 start websocket server
 
 ```bash
-python server.py
+sh run_svr.sh
 ```
 
 start chat textual-ui

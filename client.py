@@ -2,6 +2,7 @@ import logging
 import socket
 import asyncio
 import websockets
+import threading
 
 from message import Message
 
@@ -19,7 +20,15 @@ class WsClient(object):
         self.que_recv = asyncio.Queue(loop=self.loop)
 
     def start(self):
-        self.loop.run_until_complete(self.repl())
+        if asyncio.get_event_loop() == self.loop:
+            self.loop.run_until_complete(self.repl())
+            return
+
+        def _run():
+            self.loop.run_until_complete(self.repl())
+            
+        p = threading.Thread(target=_run).start()
+        return p
 
     async def send_handler(self, ws):
         while True:
@@ -81,12 +90,26 @@ class WsClient(object):
                 logging.error(err)
                 break
 
+    async def asend(self, msg):
+        return await self.que_send.put(msg)
+
+    async def arecv(self):
+        return await self.que_recv.get()
+
+    def send(self, msg):
+        return self.que_send.put_nowait(msg)
+
+    def recv(self):
+        try:
+            msg = self.que_recv.get_nowait()
+            return msg
+        except:
+            return None
 if __name__ == '__main__':
     import aioconsole
     user_name = "bob"
-    url = "ws://localhost:5555"
+    url = f"ws://localhost:5555/ws/{user_name}?token=test_token"
     client = WsClient(user_name, url) 
-#    client.start()
 
     async def interact(client):
         reader, writer = await aioconsole.get_standard_streams()
@@ -100,18 +123,15 @@ if __name__ == '__main__':
                 text=text
             )
             print(f"<< {msg}")
-            await client.que_send.put(msg)
-            if not client.connected:
-                break
+            await client.asend(msg)
 
     async def output(client):
         while True:
             try:
-                msg = await asyncio.wait_for(client.que_recv.get(), timeout=1)
+                msg = await asyncio.wait_for(client.arecv(), timeout=1)
                 print(f">> {msg}")
             except asyncio.TimeoutError:
-                if not client.connected:
-                    break
+                continue
             except Exception as err:
                 logging.exception(err)
                 logging.error('connection failed')
